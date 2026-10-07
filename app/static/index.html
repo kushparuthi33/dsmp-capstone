@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gurgaon price estimate</title>
+<meta name="description" content="Estimate the market price of a flat or house in Gurgaon from a model trained on 99acres listings.">
+<link rel="preload" href="/static/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/styles.css">
+<script>
+  (function () {
+    var saved = localStorage.getItem("theme");
+    var dark = saved ? saved === "dark" : !window.matchMedia("(prefers-color-scheme: light)").matches;
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <header class="topbar">
+    <div class="mark"><b>Gurgaon price estimate</b></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Light mode</button>
+  </header>
+
+  <div class="split">
+    <div class="col">
+      <div class="intro">
+        <h1>What is this property worth?</h1>
+        <p id="intro-copy">Describe a flat or a house in Gurgaon and the model returns the price it expects a seller to ask.</p>
+      </div>
+
+      <form id="form" novalidate>
+
+      <fieldset>
+        <legend>The property</legend>
+        <div class="row two">
+          <div class="field">
+            <label id="lbl-property_type">Property type</label>
+            <div class="seg" id="seg-property_type" role="group" aria-labelledby="lbl-property_type"></div>
+          </div>
+          <div class="field">
+            <label for="sector">Sector or locality</label>
+            <select id="sector" name="sector"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="built_up_area">Built up area</label>
+            <div class="area-wrap">
+              <input type="range" id="area_range" min="200" max="8000" step="25" value="1750" aria-label="Built up area slider">
+              <input type="number" id="built_up_area" name="built_up_area" min="100" max="40000" step="1" value="1750">
+            </div>
+            <p class="hint">Square feet of built up area. If you only know the carpet area, add about 10 percent.</p>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Rooms</legend>
+        <div class="row three">
+          <div class="field">
+            <label for="bedRoom">Bedrooms</label>
+            <select id="bedRoom" name="bedRoom"></select>
+          </div>
+          <div class="field">
+            <label for="bathroom">Bathrooms</label>
+            <select id="bathroom" name="bathroom"></select>
+          </div>
+          <div class="field">
+            <label for="balcony">Balconies</label>
+            <select id="balcony" name="balcony"></select>
+          </div>
+        </div>
+        <div class="row two">
+          <div class="field">
+            <label id="lbl-servant_room">Servant room</label>
+            <div class="seg" id="seg-servant_room" role="group" aria-labelledby="lbl-servant_room"></div>
+          </div>
+          <div class="field">
+            <label id="lbl-store_room">Store room</label>
+            <div class="seg" id="seg-store_room" role="group" aria-labelledby="lbl-store_room"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Condition</legend>
+        <div class="row two">
+          <div class="field">
+            <label for="agePossession">Age</label>
+            <select id="agePossession" name="agePossession"></select>
+          </div>
+          <div class="field">
+            <label for="floor_category">Floor</label>
+            <select id="floor_category" name="floor_category"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label id="lbl-furnishing_type">Furnishing</label>
+            <div class="seg" id="seg-furnishing_type" role="group" aria-labelledby="lbl-furnishing_type"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label id="lbl-luxury_category">Amenities</label>
+            <div class="seg" id="seg-luxury_category" role="group" aria-labelledby="lbl-luxury_category"></div>
+            <p class="hint">How well served the society is: lifts, security, pool, club house, power back up.</p>
+          </div>
+        </div>
+      </fieldset>
+
+      <button class="submit" id="submit" type="submit">Estimate price</button>
+      <div class="error-slot" id="form-error" role="alert"></div>
+      </form>
+    </div>
+
+    <aside class="result" id="result" aria-live="polite">
+      <h2>Estimate</h2>
+      <div class="placeholder">
+        <p>Fill in the property, then press Estimate price.</p>
+        <p class="caveat" id="placeholder-note">The model reads asking prices, not transaction prices.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    Built on 99acres listings scraped in 2023. Prices are the model's reading of asking prices in that period, not a valuation.
+  </footer>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
