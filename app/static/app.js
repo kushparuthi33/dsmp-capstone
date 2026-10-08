@@ -341,6 +341,35 @@ const sky = {
   canvas: null, ctx: null, towers: [], lit: -1, raf: null, w: 0, h: 0, dpr: 1, t: 0,
 };
 
+/* browsers without animation-timeline get the same move from an observer gated loop */
+function tiltFallback() {
+  const card = $("tilt-card");
+  const intro = document.querySelector(".intro");
+  if (!card || CSS.supports("animation-timeline: view()")) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    card.style.setProperty("--tilt", "0deg");
+    card.style.setProperty("--tilt-scale", "1");
+    return;
+  }
+  let running = false;
+  const step = () => {
+    const box = card.getBoundingClientRect();
+    const span = window.innerHeight + box.height;
+    const seen = Math.min(1, Math.max(0, (window.innerHeight - box.top) / span));
+    const progress = Math.min(1, Math.max(0, (seen - 0.15) / 0.45));
+    card.style.setProperty("--tilt", `${18 * (1 - progress)}deg`);
+    card.style.setProperty("--tilt-scale", `${1 + 0.04 * (1 - progress)}`);
+    if (intro) intro.style.transform = `translateY(${-46 * progress}px)`;
+    if (running) requestAnimationFrame(step);
+  };
+  new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      running = entry.isIntersecting;
+      if (running) requestAnimationFrame(step);
+    });
+  }, { rootMargin: "100px" }).observe(card);
+}
+
 function skylineSetup() {
   sky.canvas = $("skyline-canvas");
   if (!sky.canvas) return;
@@ -355,9 +384,8 @@ function skylineSetup() {
 function skylineResize() {
   if (!sky.canvas) return;
   sky.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const rect = sky.canvas.getBoundingClientRect();
-  sky.w = rect.width;
-  sky.h = rect.height;
+  sky.w = sky.canvas.clientWidth;      // layout size: the card's transform must not feed back in
+  sky.h = sky.canvas.clientHeight;
   sky.canvas.width = Math.round(sky.w * sky.dpr);
   sky.canvas.height = Math.round(sky.h * sky.dpr);
   sky.ctx.setTransform(sky.dpr, 0, 0, sky.dpr, 0, 0);
@@ -500,6 +528,7 @@ function mix(from, to, amount) {
 boot().then(() => {
   revealOnScroll();
   skylineSetup();
+  tiltFallback();
   splitHeadline();
   predict();          // the panel opens with a real number rather than an empty shell
 });
