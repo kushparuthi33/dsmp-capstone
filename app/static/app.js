@@ -76,9 +76,19 @@ function fillSectorSelect(sectors) {
   el.value = sectors.includes("sector 102") ? "sector 102" : sectors[0];
 }
 
+function moveThumb(box) {
+  const active = box.querySelector("input:checked");
+  const thumb = box.querySelector(".thumb");
+  if (!active || !thumb) return;
+  const label = active.closest("label");
+  box.style.setProperty("--thumb-w", `${label.offsetWidth}px`);
+  box.style.setProperty("--thumb-x", `${label.offsetLeft - box.offsetLeft}px`);
+  thumb.classList.add("ready");
+}
+
 function buildSegmented(name, values, labeller, selected) {
   const box = $(`seg-${name}`);
-  box.innerHTML = "";
+  box.innerHTML = '<span class="thumb"></span>';
   values.forEach((value) => {
     const id = `${name}-${String(value).replace(/\W+/g, "")}`;
     const label = document.createElement("label");
@@ -87,6 +97,8 @@ function buildSegmented(name, values, labeller, selected) {
     box.append(label);
     if (value === selected) label.querySelector("input").checked = true;
   });
+  box.addEventListener("change", () => moveThumb(box));
+  requestAnimationFrame(() => moveThumb(box));
 }
 
 async function boot() {
@@ -100,7 +112,7 @@ async function boot() {
 
   const metrics = options._metrics;
   $("intro-copy").innerHTML =
-    `Describe a flat or a house in Gurgaon and the model returns the price it expects a seller to ask. ` +
+    `Move any control and the estimate follows. ` +
     `It learned from <b>${metrics.rows.toLocaleString("en-IN")} listings</b> and is typically off by about ` +
     `<b>${metrics.mae.toFixed(2)} crore</b>.`;
 
@@ -138,34 +150,46 @@ $("built_up_area").addEventListener("input", (e) => {
 });
 
 /* predicting --------------------------------------------------------------- */
-$("form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const area = Number($("built_up_area").value);
-  const errorSlot = $("form-error");
-  errorSlot.innerHTML = "";
+let pending = null;
+let lastPrice = 0;
 
-  if (!Number.isFinite(area) || area < 100 || area > 40000) {
-    errorSlot.innerHTML = '<p class="error">Built up area has to be between 100 and 40,000 square feet.</p>';
-    $("built_up_area").focus();
-    return;
-  }
+$("form").addEventListener("submit", (event) => { event.preventDefault(); predict(); });
+// every control feeds the panel, so the estimate moves while the property is described
+$("form").addEventListener("input", () => {
+  clearTimeout(pending);
+  pending = setTimeout(predict, 260);
+});
 
-  const body = {
+function readForm() {
+  return {
     property_type: checked("property_type"),
     sector: $("sector").value,
     bedRoom: Number($("bedRoom").value),
     bathroom: Number($("bathroom").value),
     balcony: $("balcony").value,
     agePossession: $("agePossession").value,
-    built_up_area: area,
+    built_up_area: Number($("built_up_area").value),
     "servant room": Number(checked("servant_room")),
     "store room": Number(checked("store_room")),
     furnishing_type: checked("furnishing_type"),
     luxury_category: checked("luxury_category"),
     floor_category: $("floor_category").value,
   };
+}
 
-  showSkeleton();
+async function predict() {
+  clearTimeout(pending);
+  const errorSlot = $("form-error");
+  errorSlot.innerHTML = "";
+  const area = Number($("built_up_area").value);
+  if (!Number.isFinite(area) || area < 100 || area > 40000) {
+    errorSlot.innerHTML = '<p class="error">Built up area has to be between 100 and 40,000 square feet.</p>';
+    return;
+  }
+  const body = readForm();
+
+  if (!document.querySelector(".price")) showSkeleton();
+  $("result").dataset.busy = "true";
   $("submit").disabled = true;
   try {
     const res = await fetch("/api/predict", {
@@ -183,8 +207,9 @@ $("form").addEventListener("submit", async (event) => {
     showError("The server is not responding. Is uvicorn still running?");
   } finally {
     $("submit").disabled = false;
+    $("result").dataset.busy = "false";
   }
-});
+}
 
 const checked = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
 
@@ -210,34 +235,98 @@ function showError(message) {
     </div>`;
 }
 
+let previous = null;
+
 function showResult(data, body) {
-  const inr = (value) => `${value.toFixed(2)} Cr`;
+  const m = data.market;
+  const step = previous === null ? 0 : data.price - previous;
+  previous = data.price;
+  const chip = Math.abs(step) >= 0.01
+    ? `<span class="delta${step < 0 ? " down" : ""}">${step > 0 ? "+" : ""}${step.toFixed(2)}</span>`
+    : "";
+  const inr = (v) => v.toFixed(2);
+  const where = m.scope === "sector" ? body.sector.replace(/\b\w/g, (c) => c.toUpperCase()) : `Gurgaon ${body.property_type}s`;
+  const verdict = m.cheaper_than >= 50
+    ? `Cheaper than <b>${m.cheaper_than}%</b> of the ${m.n} comparable listings in ${where}.`
+    : `Dearer than <b>${100 - m.cheaper_than}%</b> of the ${m.n} comparable listings in ${where}.`;
+
+  const tallest = Math.max(...m.bins.map((b) => b.count)) || 1;
+  const columns = m.bins.map((b, i) => {
+    const here = data.price >= b.from && (data.price < b.to || i === m.bins.length - 1);
+    return `<div class="col${here ? " here" : ""}" style="height:${Math.max(6, (b.count / tallest) * 100)}%;animation-delay:${i * 28}ms"
+      title="${b.count} listings between ${inr(b.from)} and ${inr(b.to)} crore"></div>`;
+  }).join("");
+
+  const spanLeft = ((data.low - m.bins[0].from) / (m.bins.at(-1).to - m.bins[0].from)) * 100;
+  const spanWidth = ((data.high - data.low) / (m.bins.at(-1).to - m.bins[0].from)) * 100;
+  const pinAt = ((data.price - m.bins[0].from) / (m.bins.at(-1).to - m.bins[0].from)) * 100;
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+
   $("result").innerHTML = `
     <h2>Estimate</h2>
-    <p class="price">₹ ${inr(data.price)}</p>
-    <p class="range">₹ ${inr(data.low)} to ₹ ${inr(data.high)}</p>
+    <p class="price"><span class="rupee">₹</span><span data-figure>${inr(data.price)}</span><span class="unit">Cr</span>${chip}</p>
+    <p class="verdict">${verdict}</p>
+
+    <div class="rangebar">
+      <div class="track">
+        <div class="span" style="left:${clamp(spanLeft)}%;width:${clamp(spanWidth)}%"></div>
+        <div class="pin" style="left:calc(${clamp(pinAt)}% - 1.5px)"></div>
+      </div>
+      <div class="ends"><span>₹ ${inr(data.low)} Cr</span><span>₹ ${inr(data.high)} Cr</span></div>
+    </div>
+
+    <div class="spread">
+      <div class="cols">${columns}</div>
+      <div class="legend"><span>What ${where} asks</span><span>median ₹ ${inr(m.median)} Cr</span></div>
+    </div>
+
     <dl class="facts">
       <div class="fact"><dt>Per square foot</dt><dd>₹ ${data.per_sqft.toLocaleString("en-IN")}</dd></div>
-      <div class="fact"><dt>Built up area</dt><dd>${body.built_up_area.toLocaleString("en-IN")} sq ft</dd></div>
+      <div class="fact"><dt>Local median</dt><dd>₹ ${m.median_per_sqft.toLocaleString("en-IN")}</dd></div>
       <div class="fact"><dt>Configuration</dt><dd>${body.bedRoom} BHK ${body.property_type}</dd></div>
-      <div class="fact"><dt>Location</dt><dd>${body.sector.replace(/\b\w/g, (c) => c.toUpperCase())}</dd></div>
     </dl>
     <p class="caveat">${data.coverage}% of the model's test predictions landed inside a range this wide.</p>`;
   animatePrice(data.price);
 }
 
 function animatePrice(target) {
-  const el = document.querySelector(".price");
-  if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const el = document.querySelector("[data-figure]");
+  if (!el) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = target.toFixed(2);
+    lastPrice = target;
+    return;
+  }
+  const from = lastPrice || 0;
   const start = performance.now();
-  const duration = 520;
+  const duration = 480;
   const step = (now) => {
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
-    el.textContent = `₹ ${(target * eased).toFixed(2)} Cr`;
+    el.textContent = (from + (target - from) * eased).toFixed(2);
     if (t < 1) requestAnimationFrame(step);
+    else lastPrice = target;
   };
   requestAnimationFrame(step);
 }
 
-boot();
+function revealOnScroll() {
+  const blocks = document.querySelectorAll(".intro, fieldset, .result, footer");
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  blocks.forEach((el) => el.classList.add("inview"));
+  const watcher = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("seen");
+      watcher.unobserve(entry.target);
+    });
+  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+  blocks.forEach((el) => watcher.observe(el));
+}
+
+window.addEventListener("resize", () => document.querySelectorAll(".seg").forEach(moveThumb));
+
+boot().then(() => {
+  revealOnScroll();
+  predict();          // the panel opens with a real number rather than an empty shell
+});

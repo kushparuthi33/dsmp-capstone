@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = ROOT / "models" / "pipeline_claude.pkl"
 OPTIONS_PATH = ROOT / "models" / "options_claude.json"
+LISTINGS_PATH = ROOT / "data" / "processed" / "gurgaon_properties_post_feature_selection_claude_v2.csv"
 STATIC = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="Gurgaon price predictor", docs_url="/api/docs")
@@ -36,6 +37,7 @@ def load_model():
 
 pipeline = load_model()
 options = json.loads(OPTIONS_PATH.read_text())
+listings = pd.read_csv(LISTINGS_PATH)          # the training rows, used to place a prediction in its market
 FEATURES = [
     "property_type", "sector", "bedRoom", "bathroom", "balcony", "agePossession",
     "built_up_area", "servant room", "store room", "furnishing_type",
@@ -80,6 +82,10 @@ def predict(prop: Property):
     except Exception as exc:  # the pipeline rejects a combination it cannot encode
         raise HTTPException(500, f"the model could not score this property: {exc}") from exc
 
+    comparables = listings[(listings["sector"] == row["sector"]) & (listings["property_type"] == row["property_type"])]
+    if len(comparables) < 12:
+        comparables = listings[listings["property_type"] == row["property_type"]]
+
     band = options["_band"]          # log space half width that held _coverage of the test errors
     low, high = predicted * np.exp(-band), predicted * np.exp(band)
     return {
@@ -88,6 +94,25 @@ def predict(prop: Property):
         "high": round(high, 2),
         "per_sqft": round(predicted * 1e7 / row["built_up_area"]),
         "coverage": round(options["_coverage"] * 100),
+        "market": market_context(comparables, predicted, row),
+    }
+
+
+def market_context(comparables, predicted, row):
+    """Where this prediction sits among the listings it was trained on."""
+    prices = comparables["price"].to_numpy()
+    psf = (comparables["price"] * 1e7 / comparables["built_up_area"]).to_numpy()
+    edges = np.quantile(prices, np.linspace(0, 1, 13))          # 12 buckets of equal listing count
+    edges = np.unique(np.round(edges, 3))
+    counts, _ = np.histogram(prices, bins=edges)
+    return {
+        "n": int(len(comparables)),
+        "scope": "sector" if comparables["sector"].nunique() == 1 else "city",
+        "bins": [{"from": float(edges[i]), "to": float(edges[i + 1]), "count": int(c)} for i, c in enumerate(counts)],
+        "position": float(np.clip((prices < predicted).mean(), 0, 1)),
+        "median": round(float(np.median(prices)), 2),
+        "median_per_sqft": round(float(np.median(psf))),
+        "cheaper_than": round(float((prices > predicted).mean()) * 100),
     }
 
 

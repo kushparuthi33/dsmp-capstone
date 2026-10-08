@@ -9,6 +9,13 @@
   font-display: swap;
 }
 @font-face {
+  font-family: "Bricolage";
+  src: url("/static/fonts/bricolage.woff2") format("woff2");
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+}
+@font-face {
   font-family: "Geist Mono";
   src: url("/static/fonts/geist-mono.woff2") format("woff2");
   font-weight: 100 900;
@@ -28,6 +35,15 @@
   --accent: #c6f24e;
   --accent-ink: #15200a;
   --accent-soft: rgba(198, 242, 78, 0.14);
+  --accent-line: rgba(198, 242, 78, 0.4);
+  --glow-a: rgba(198, 242, 78, 0.14);
+  --glow-b: rgba(120, 200, 180, 0.11);
+  --glow-c: rgba(198, 242, 78, 0.08);
+  --grain-opacity: 0.035;
+  --edge-strong: rgba(255, 255, 255, 0.14);
+  --edge-soft: rgba(255, 255, 255, 0.04);
+  --down: #ffb4a2;
+  --down-soft: rgba(255, 141, 123, 0.14);
   --danger: #ff8d7b;
   --radius: 12px;
   --radius-inner: 8px;
@@ -48,6 +64,15 @@
   --accent: #51730c;
   --accent-ink: #ffffff;
   --accent-soft: rgba(81, 115, 12, 0.1);
+  --accent-line: rgba(81, 115, 12, 0.35);
+  --glow-a: rgba(81, 115, 12, 0.12);
+  --glow-b: rgba(40, 110, 95, 0.09);
+  --glow-c: rgba(81, 115, 12, 0.07);
+  --grain-opacity: 0.025;
+  --edge-strong: rgba(23, 23, 26, 0.1);
+  --edge-soft: rgba(23, 23, 26, 0.03);
+  --down: #8a2a17;
+  --down-soft: rgba(168, 48, 27, 0.1);
   --danger: #a8301b;
   --shadow: 0 20px 50px rgba(28, 28, 20, 0.08);
   color-scheme: light;
@@ -67,6 +92,24 @@
     --accent: #51730c;
     --accent-ink: #ffffff;
     --accent-soft: rgba(81, 115, 12, 0.1);
+    --accent-line: rgba(81, 115, 12, 0.35);
+  --glow-a: rgba(81, 115, 12, 0.12);
+  --glow-b: rgba(40, 110, 95, 0.09);
+  --glow-c: rgba(81, 115, 12, 0.07);
+  --grain-opacity: 0.025;
+  --edge-strong: rgba(23, 23, 26, 0.1);
+  --edge-soft: rgba(23, 23, 26, 0.03);
+  --down: #8a2a17;
+  --down-soft: rgba(168, 48, 27, 0.1);
+  --accent-line: rgba(81, 115, 12, 0.35);
+  --glow-a: rgba(81, 115, 12, 0.12);
+  --glow-b: rgba(40, 110, 95, 0.09);
+  --glow-c: rgba(81, 115, 12, 0.07);
+  --grain-opacity: 0.025;
+  --edge-strong: rgba(23, 23, 26, 0.1);
+  --edge-soft: rgba(23, 23, 26, 0.03);
+  --down: #8a2a17;
+  --down-soft: rgba(168, 48, 27, 0.1);
     --danger: #a8301b;
     --shadow: 0 20px 50px rgba(28, 28, 20, 0.08);
     color-scheme: light;
@@ -241,14 +284,21 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 }
 .result h2 { margin: 0 0 20px; font-size: 13px; font-weight: 500; color: var(--text-faint); }
 .price {
-  font-family: "Geist Mono", ui-monospace, monospace;
-  font-size: clamp(2.4rem, 6vw, 3.2rem);
-  font-weight: 500;
+  font-family: "Bricolage", "Geist", sans-serif;
+  font-variation-settings: "wdth" 100, "opsz" 96;
+  font-size: clamp(3rem, 7.5vw, 4.4rem);
+  font-weight: 700;
   letter-spacing: -0.045em;
-  line-height: 1;
+  line-height: 0.95;
   color: var(--accent);
-  margin: 0 0 10px;
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 0.12em;
 }
+.price .unit { font-size: 0.42em; font-weight: 500; letter-spacing: -0.01em; color: var(--text-muted); }
+.price .rupee { font-size: 0.5em; font-weight: 500; color: var(--text-muted); }
 .range { font-family: "Geist Mono", ui-monospace, monospace; font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
 .facts { display: grid; gap: 1px; background: var(--line); border-radius: var(--radius-inner); overflow: hidden; }
 .fact { display: flex; justify-content: space-between; gap: 16px; background: var(--surface); padding: 13px 15px; font-size: 13px; }
@@ -275,3 +325,210 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 
 footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-faint); }
 footer a { color: var(--text-muted); }
+
+/* the estimate panel ------------------------------------------------------- */
+/* a prediction on its own means little, so the panel places it against the
+   listings the model trained on: a range bar and the spread for that sector */
+
+.verdict { font-size: 13px; color: var(--text-muted); margin: 0 0 22px; }
+.verdict b { color: var(--text); font-weight: 500; }
+
+.rangebar { margin: 0 0 26px; }
+.rangebar .track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-high);
+  overflow: visible;
+}
+.rangebar .span {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  transform-origin: left center;
+  animation: grow 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.rangebar .pin {
+  position: absolute;
+  top: -5px;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: drop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+.rangebar .ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 9px;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+@keyframes grow { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes drop { from { transform: translateY(-6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* spread of comparable listings, drawn as columns the prediction sits inside */
+.spread { margin: 0 0 24px; }
+.spread .cols { display: flex; align-items: flex-end; gap: 3px; height: 62px; }
+.spread .col {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--surface-high);
+  transform-origin: bottom center;
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.spread .col.here { background: var(--accent); }
+.spread .legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+@keyframes rise { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+
+/* the panel breathing while a new number is on its way */
+.result[data-busy="true"] .price { opacity: 0.45; }
+.result .price { transition: opacity 0.18s; }
+
+/* staggered entry for the form blocks, once, on load */
+.reveal { animation: lift 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes lift { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rangebar .span, .rangebar .pin, .spread .col, .reveal { animation: none !important; }
+}
+
+/* moving layers ------------------------------------------------------------ */
+/* two slow drifting fields of accent light and a grain plate, both fixed and
+   inert. they give the page depth without competing with the numbers. */
+
+.aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; pointer-events: none; }
+.aurora span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.aurora span:nth-child(1) {
+  width: 46vw; height: 46vw; left: -10vw; top: -14vw;
+  background: radial-gradient(circle, var(--glow-a), transparent 68%);
+  animation: drift-a 34s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(2) {
+  width: 38vw; height: 38vw; right: -8vw; top: 18vh;
+  background: radial-gradient(circle, var(--glow-b), transparent 68%);
+  animation: drift-b 42s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(3) {
+  width: 32vw; height: 32vw; left: 32vw; bottom: -14vw;
+  background: radial-gradient(circle, var(--glow-c), transparent 70%);
+  animation: drift-c 38s ease-in-out infinite alternate;
+}
+@keyframes drift-a { to { transform: translate3d(8vw, 6vh, 0) scale(1.15); } }
+@keyframes drift-b { to { transform: translate3d(-7vw, 10vh, 0) scale(0.9); } }
+@keyframes drift-c { to { transform: translate3d(6vw, -8vh, 0) scale(1.2); } }
+
+.grain {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* the sliding thumb on a segmented control: the move itself shows the change */
+.seg { position: relative; }
+.seg .thumb {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 0;
+  width: var(--thumb-w, 0px);
+  transform: translateX(var(--thumb-x, 0px));
+  border-radius: var(--radius-inner);
+  background: var(--pressed);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition: transform 0.34s cubic-bezier(0.32, 1.24, 0.42, 1), width 0.34s cubic-bezier(0.32, 1.24, 0.42, 1), opacity 0.2s;
+}
+.seg .thumb.ready { opacity: 1; }
+.seg label { position: relative; z-index: 1; }
+.seg label:has(input:checked) { background: transparent; box-shadow: none; }
+
+/* what the last change did to the number */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-variation-settings: normal;      /* the figure beside it is a variable face, this one is not */
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+  animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.delta.down { background: var(--down-soft); color: var(--down); }
+@keyframes pop { from { opacity: 0; transform: translateY(4px) scale(0.94); } to { opacity: 1; transform: none; } }
+
+/* sections arriving as they come into view */
+.inview { opacity: 0; transform: translateY(18px); }
+.inview.seen { animation: lift 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* the panel edge catches the light */
+.result { position: sticky; overflow: hidden; }
+.result::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(145deg, var(--edge-strong), transparent 38%, transparent 62%, var(--edge-soft));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora span { animation: none !important; }
+  .seg .thumb { transition: none !important; }
+  .inview { opacity: 1; transform: none; }
+}
+
+/* on a phone the panel leads and stays in view, so the number is visible while the form is filled */
+@media (max-width: 959px) {
+  .split { gap: 28px; }
+  .result {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -24px;
+    padding: 18px 24px 20px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    background: var(--bg);
+    box-shadow: 0 12px 24px -16px rgba(0, 0, 0, 0.6);
+  }
+  .result::after { display: none; }
+  .result h2 { position: absolute; left: -9999px; }
+  .price { font-size: clamp(2.4rem, 11vw, 3rem); margin-bottom: 2px; }
+  .verdict { margin-bottom: 14px; }
+  .spread, .facts, .caveat { display: none; }
+  .rangebar { margin-bottom: 0; }
+}

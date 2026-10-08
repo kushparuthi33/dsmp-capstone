@@ -179,11 +179,42 @@
    0.0
   ]
  },
- "_band": 0.19125713399759253,
+ "_ordered": {
+  "balcony": [
+   "0",
+   "1",
+   "2",
+   "3",
+   "3+"
+  ],
+  "luxury_category": [
+   "Low",
+   "Medium",
+   "High"
+  ],
+  "furnishing_type": [
+   "unfurnished",
+   "semifurnished",
+   "furnished"
+  ],
+  "floor_category": [
+   "Low Floor",
+   "Mid Floor",
+   "High Floor"
+  ],
+  "agePossession": [
+   "Under Construction",
+   "New Property",
+   "Relatively New",
+   "Moderately Old",
+   "Old Property"
+  ]
+ },
+ "_band": 0.1882526306337794,
  "_coverage": 0.8,
  "_metrics": {
-  "r2": 0.8970034779595901,
-  "mae": 0.5026962898754529,
+  "r2": 0.8935469455759033,
+  "mae": 0.5130498733627566,
   "rows": 3627
  }
 }
