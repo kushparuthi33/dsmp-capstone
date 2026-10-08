@@ -105,8 +105,10 @@ def market_context(comparables, predicted, row):
     edges = np.quantile(prices, np.linspace(0, 1, 13))          # 12 buckets of equal listing count
     edges = np.unique(np.round(edges, 3))
     counts, _ = np.histogram(prices, bins=edges)
+    sample = np.sort(prices)[:: max(1, len(prices) // 120)][:120]
     return {
         "n": int(len(comparables)),
+        "prices": [round(float(v), 3) for v in sample],   # one tower per comparable listing
         "scope": "sector" if comparables["sector"].nunique() == 1 else "city",
         "bins": [{"from": float(edges[i]), "to": float(edges[i + 1]), "count": int(c)} for i, c in enumerate(counts)],
         "position": float(np.clip((prices < predicted).mean(), 0, 1)),

@@ -264,7 +264,7 @@ function showResult(data, body) {
 
   $("result").innerHTML = `
     <h2>Estimate</h2>
-    <p class="price"><span class="rupee">₹</span><span data-figure>${inr(data.price)}</span><span class="unit">Cr</span>${chip}</p>
+    <p class="price"><span class="rupee">₹</span><span class="odometer" data-figure></span><span class="unit">Cr</span>${chip}</p>
     <p class="verdict">${verdict}</p>
 
     <div class="rangebar">
@@ -286,28 +286,34 @@ function showResult(data, body) {
       <div class="fact"><dt>Configuration</dt><dd>${body.bedRoom} BHK ${body.property_type}</dd></div>
     </dl>
     <p class="caveat">${data.coverage}% of the model's test predictions landed inside a range this wide.</p>`;
-  animatePrice(data.price);
+  rollTo(data.price);
+  skylineUpdate(m.prices, data.price, where);
 }
 
-function animatePrice(target) {
-  const el = document.querySelector("[data-figure]");
-  if (!el) return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    el.textContent = target.toFixed(2);
-    lastPrice = target;
-    return;
+/* each digit is a strip of 0 to 9 that slides to the one it should show */
+function rollTo(value) {
+  const box = document.querySelector("[data-figure]");
+  if (!box) return;
+  const text = value.toFixed(2);
+  if (box.children.length !== text.length) {
+    box.innerHTML = [...text].map((ch) => ch === "."
+      ? '<span class="fixed">.</span>'
+      : `<span class="digit"><i>${"0123456789".split("").join("<br>")}</i></span>`).join("");
   }
-  const from = lastPrice || 0;
-  const start = performance.now();
-  const duration = 480;
-  const step = (now) => {
-    const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3);
-    el.textContent = (from + (target - from) * eased).toFixed(2);
-    if (t < 1) requestAnimationFrame(step);
-    else lastPrice = target;
-  };
-  requestAnimationFrame(step);
+  [...text].forEach((ch, i) => {
+    const cell = box.children[i];
+    const strip = cell.querySelector("i");
+    if (strip) strip.style.transform = `translateY(-${Number(ch) * 10}%)`;
+  });
+  lastPrice = value;
+}
+
+function splitHeadline() {
+  const head = $("headline");
+  if (!head || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  head.innerHTML = head.textContent.trim().split(" ")
+    .map((word, i) => `<span class="word"><span style="--d:${i * 70}ms">${word}</span></span>`)
+    .join(" ");
 }
 
 function revealOnScroll() {
@@ -326,7 +332,174 @@ function revealOnScroll() {
 
 window.addEventListener("resize", () => document.querySelectorAll(".seg").forEach(moveThumb));
 
+
+/* the skyline -------------------------------------------------------------- */
+/* one tower per comparable listing, ordered by price. the tower the estimate
+   lands on is lit and the row re-settles whenever the estimate changes. */
+
+const sky = {
+  canvas: null, ctx: null, towers: [], lit: -1, raf: null, w: 0, h: 0, dpr: 1, t: 0,
+};
+
+function skylineSetup() {
+  sky.canvas = $("skyline-canvas");
+  if (!sky.canvas) return;
+  sky.ctx = sky.canvas.getContext("2d");
+  skylineResize();
+  new ResizeObserver(skylineResize).observe(sky.canvas.parentElement);
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    sky.raf = requestAnimationFrame(skylineFrame);
+  }
+}
+
+function skylineResize() {
+  if (!sky.canvas) return;
+  sky.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rect = sky.canvas.getBoundingClientRect();
+  sky.w = rect.width;
+  sky.h = rect.height;
+  sky.canvas.width = Math.round(sky.w * sky.dpr);
+  sky.canvas.height = Math.round(sky.h * sky.dpr);
+  sky.ctx.setTransform(sky.dpr, 0, 0, sky.dpr, 0, 0);
+  skylineDraw();
+}
+
+function skylineUpdate(prices, price, where) {
+  if (!sky.ctx || !prices.length) return;
+  // scaling by the tallest tower squashes everything else, so the band is scaled to the
+  // 92nd percentile and the few above it are clipped to the top
+  const ranked = [...prices].sort((a, b) => a - b);
+  const top = Math.max(ranked[Math.floor(ranked.length * 0.92)] || 1, price) * 1.04;
+  const next = prices.map((value) => value / top);
+  // keep the towers that exist, grow or shrink the rest, so the row morphs instead of jumping
+  sky.towers = next.map((target, i) => {
+    const old = sky.towers[i];
+    return {
+      target: Math.min(1, target),
+      current: old ? old.current : 0,
+      seed: old ? old.seed : Math.random() * Math.PI * 2,
+      lit: 0,
+    };
+  });
+  let nearest = 0;
+  prices.forEach((value, i) => {
+    if (Math.abs(value - price) < Math.abs(prices[nearest] - price)) nearest = i;
+  });
+  sky.lit = nearest;
+  $("skyline-label").textContent = `${prices.length} listings in ${where}, tallest ₹ ${Math.max(...prices).toFixed(2)} Cr`;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    sky.towers.forEach((t) => { t.current = t.target; });
+    skylineDraw();
+  }
+}
+
+function skylineFrame(now) {
+  sky.t = now / 1000;
+  let moving = false;
+  sky.towers.forEach((tower, i) => {
+    const gap = tower.target - tower.current;
+    if (Math.abs(gap) > 0.0004) { tower.current += gap * 0.12; moving = true; }
+    const want = i === sky.lit ? 1 : 0;
+    const litGap = want - tower.lit;
+    if (Math.abs(litGap) > 0.004) { tower.lit += litGap * 0.1; moving = true; }
+  });
+  skylineDraw();
+  sky.raf = requestAnimationFrame(skylineFrame);
+  return moving;
+}
+
+function skylineDraw() {
+  const { ctx, w, h } = sky;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
+  if (!sky.towers.length) return;
+
+  const styles = getComputedStyle(document.documentElement);
+  const accent = styles.getPropertyValue("--accent").trim();
+  const quiet = styles.getPropertyValue("--tower").trim();
+  const quietTop = styles.getPropertyValue("--tower-top").trim();
+  const floor = h - 24;
+  const count = sky.towers.length;
+  const slot = w / count;
+  const width = Math.max(4, slot * 0.66);
+
+  ctx.fillStyle = styles.getPropertyValue("--line").trim();
+  ctx.fillRect(0, floor + 1, w, 1);
+
+  // a light that travels along the row every few seconds
+  const sweep = ((sky.t * 0.18) % 1.6) - 0.3;
+
+  sky.towers.forEach((tower, i) => {
+    const place = i / Math.max(1, count - 1);
+    const sway = Math.sin(sky.t * 0.6 + tower.seed) * 2;
+    const height = Math.max(6, tower.current * (floor - 14) + sway);
+    const x = i * slot + (slot - width) / 2;
+    const y = floor - height;
+    const near = Math.max(0, 1 - Math.abs(place - sweep) * 7);   // how close the sweep is
+
+    const fill = ctx.createLinearGradient(0, y, 0, floor);
+    fill.addColorStop(0, tower.lit > 0.02 ? mix(quietTop, accent, tower.lit) : quietTop);
+    fill.addColorStop(1, tower.lit > 0.02 ? mix(quiet, accent, tower.lit * 0.75) : quiet);
+    ctx.fillStyle = fill;
+    roundedTop(ctx, x, y, width, height, Math.min(width / 2, 3));
+    ctx.fill();
+
+    if (near > 0.02 && tower.lit < 0.5) {
+      ctx.save();
+      ctx.globalAlpha = near * 0.5;
+      ctx.fillStyle = accent;
+      roundedTop(ctx, x, y, width, height, Math.min(width / 2, 3));
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (width >= 7) {
+      const rows = Math.floor(height / 10);
+      ctx.fillStyle = `rgba(255,255,255,${0.06 + 0.08 * tower.lit})`;
+      for (let r = 0; r < rows; r++) {
+        if (Math.sin(sky.t * 1.2 + r * 0.9 + tower.seed * 2) > 0.5) {
+          ctx.fillRect(x + width * 0.3, y + 8 + r * 10, width * 0.4, 2.5);
+        }
+      }
+    }
+
+    if (tower.lit > 0.3) {
+      ctx.save();
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 26 * tower.lit;
+      ctx.fillStyle = accent;
+      roundedTop(ctx, x, y, width, Math.min(height, 7), Math.min(width / 2, 3));
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+}
+
+function roundedTop(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+}
+
+function mix(from, to, amount) {
+  const read = (c) => {
+    const probe = document.createElement("canvas").getContext("2d");
+    probe.fillStyle = c;
+    const hex = probe.fillStyle;
+    return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  };
+  const a = read(from), b = read(to);
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * amount)).join(",")})`;
+}
+
 boot().then(() => {
   revealOnScroll();
+  skylineSetup();
+  splitHeadline();
   predict();          // the panel opens with a real number rather than an empty shell
 });

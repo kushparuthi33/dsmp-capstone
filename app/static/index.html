@@ -26,13 +26,18 @@
     <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Light mode</button>
   </header>
 
+  <div class="intro">
+    <h1 id="headline">What is this property worth?</h1>
+    <p id="intro-copy">Describe a flat or a house in Gurgaon and the model returns the price it expects a seller to ask.</p>
+  </div>
+
+  <section class="skyline" aria-hidden="true">
+    <canvas id="skyline-canvas"></canvas>
+    <p class="skyline-caption"><span id="skyline-label">the market</span></p>
+  </section>
+
   <div class="split">
     <div class="col">
-      <div class="intro">
-        <h1>What is this property worth?</h1>
-        <p id="intro-copy">Describe a flat or a house in Gurgaon and the model returns the price it expects a seller to ask.</p>
-      </div>
-
       <form id="form" novalidate>
 
       <fieldset>

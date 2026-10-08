@@ -27,6 +27,8 @@
   --surface: #121214;
   --surface-high: #171719;
   --pressed: #23232a;
+  --tower: #2b2e36;
+  --tower-top: #3b404b;
   --line: #26262a;
   --line-strong: #37373d;
   --text: #f4f4f5;
@@ -36,9 +38,9 @@
   --accent-ink: #15200a;
   --accent-soft: rgba(198, 242, 78, 0.14);
   --accent-line: rgba(198, 242, 78, 0.4);
-  --glow-a: rgba(198, 242, 78, 0.14);
-  --glow-b: rgba(120, 200, 180, 0.11);
-  --glow-c: rgba(198, 242, 78, 0.08);
+  --glow-a: rgba(198, 242, 78, 0.28);
+  --glow-b: rgba(120, 200, 180, 0.22);
+  --glow-c: rgba(198, 242, 78, 0.18);
   --grain-opacity: 0.035;
   --edge-strong: rgba(255, 255, 255, 0.14);
   --edge-soft: rgba(255, 255, 255, 0.04);
@@ -56,6 +58,8 @@
   --surface: #ffffff;
   --surface-high: #f4f4f2;
   --pressed: #e8e8e3;
+  --tower: #d4d4cd;
+  --tower-top: #bcbcb4;
   --line: #e3e3df;
   --line-strong: #c9c9c3;
   --text: #17171a;
@@ -65,9 +69,9 @@
   --accent-ink: #ffffff;
   --accent-soft: rgba(81, 115, 12, 0.1);
   --accent-line: rgba(81, 115, 12, 0.35);
-  --glow-a: rgba(81, 115, 12, 0.12);
-  --glow-b: rgba(40, 110, 95, 0.09);
-  --glow-c: rgba(81, 115, 12, 0.07);
+  --glow-a: rgba(81, 115, 12, 0.2);
+  --glow-b: rgba(40, 110, 95, 0.16);
+  --glow-c: rgba(81, 115, 12, 0.13);
   --grain-opacity: 0.025;
   --edge-strong: rgba(23, 23, 26, 0.1);
   --edge-soft: rgba(23, 23, 26, 0.03);
@@ -84,6 +88,10 @@
     --surface: #ffffff;
     --surface-high: #f4f4f2;
     --pressed: #e8e8e3;
+    --tower: #d4d4cd;
+  --tower-top: #bcbcb4;
+  --tower: #d4d4cd;
+  --tower-top: #bcbcb4;
     --line: #e3e3df;
     --line-strong: #c9c9c3;
     --text: #17171a;
@@ -93,18 +101,18 @@
     --accent-ink: #ffffff;
     --accent-soft: rgba(81, 115, 12, 0.1);
     --accent-line: rgba(81, 115, 12, 0.35);
-  --glow-a: rgba(81, 115, 12, 0.12);
-  --glow-b: rgba(40, 110, 95, 0.09);
-  --glow-c: rgba(81, 115, 12, 0.07);
+  --glow-a: rgba(81, 115, 12, 0.2);
+  --glow-b: rgba(40, 110, 95, 0.16);
+  --glow-c: rgba(81, 115, 12, 0.13);
   --grain-opacity: 0.025;
   --edge-strong: rgba(23, 23, 26, 0.1);
   --edge-soft: rgba(23, 23, 26, 0.03);
   --down: #8a2a17;
   --down-soft: rgba(168, 48, 27, 0.1);
   --accent-line: rgba(81, 115, 12, 0.35);
-  --glow-a: rgba(81, 115, 12, 0.12);
-  --glow-b: rgba(40, 110, 95, 0.09);
-  --glow-c: rgba(81, 115, 12, 0.07);
+  --glow-a: rgba(81, 115, 12, 0.2);
+  --glow-b: rgba(40, 110, 95, 0.16);
+  --glow-c: rgba(81, 115, 12, 0.13);
   --grain-opacity: 0.025;
   --edge-strong: rgba(23, 23, 26, 0.1);
   --edge-soft: rgba(23, 23, 26, 0.03);
@@ -531,4 +539,60 @@ footer a { color: var(--text-muted); }
   .verdict { margin-bottom: 14px; }
   .spread, .facts, .caveat { display: none; }
   .rangebar { margin-bottom: 0; }
+}
+
+/* the skyline ------------------------------------------------------------- */
+/* every comparable listing in the chosen sector is a tower, ordered by price.
+   the tower the estimate falls on is lit. the whole row re-animates on change. */
+
+.skyline {
+  position: relative;
+  margin: 0 -24px 52px;
+  padding: 0 24px;
+  height: 210px;
+}
+.skyline canvas { display: block; width: 100%; height: 100%; }
+.skyline-caption {
+  position: absolute;
+  left: 24px;
+  bottom: -22px;
+  margin: 0;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* the figure rolls digit by digit, like a meter settling */
+.odometer { display: inline-flex; }
+.odometer .digit {
+  display: inline-block;
+  overflow: hidden;
+  height: 1em;
+  line-height: 1;
+}
+.odometer .digit i {
+  display: block;
+  font-style: normal;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.3, 1);
+  will-change: transform;
+}
+.odometer .fixed { display: inline-block; }
+
+/* the headline arrives a word at a time from behind a mask */
+.word { display: inline-block; overflow: hidden; vertical-align: bottom; }
+.word > span {
+  display: inline-block;
+  transform: translateY(105%);
+  animation: rise-word 0.72s cubic-bezier(0.18, 1, 0.26, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes rise-word { to { transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .word > span { animation: none; transform: none; }
+  .odometer .digit i { transition: none; }
+}
+
+@media (max-width: 959px) {
+  .skyline { height: 150px; margin-bottom: 44px; }
 }
