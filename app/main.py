@@ -14,6 +14,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -118,9 +119,18 @@ def market_context(comparables, predicted, row):
     }
 
 
-app.mount("/static", StaticFiles(directory=STATIC), name="static")
+class FreshFiles(StaticFiles):
+    """Edits to the page should show on a plain reload, so nothing here is cached."""
+
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
+
+app.mount("/static", FreshFiles(directory=STATIC), name="static")
 
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache, must-revalidate"})

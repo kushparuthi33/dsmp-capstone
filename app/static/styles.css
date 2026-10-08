@@ -179,7 +179,15 @@ body {
 .theme-toggle:active { transform: scale(0.98); }
 
 /* page head --------------------------------------------------------------- */
-.intro { max-width: 36ch; margin-bottom: 44px; }
+.intro {
+  max-width: 36ch;
+  min-height: 34vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 0;
+  will-change: transform;
+}
 .intro h1 {
   font-size: clamp(2.1rem, 5vw, 3.1rem);
   line-height: 1.04;
@@ -593,15 +601,19 @@ footer a { color: var(--text-muted); }
 
 .tilt-stage {
   position: relative;
+  height: 138vh;                /* the track the card is pinned against while it flattens */
   margin: 0 -24px 58px;
   padding: 0 24px;
   perspective: 1200px;
   perspective-origin: 50% 0%;
 }
 .tilt-card {
+  position: sticky;
+  top: 14vh;
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
-  transform: rotateX(var(--tilt, 18deg)) scale(var(--tilt-scale, 1.04));
+  transform: rotateX(var(--tilt, 26deg)) scale(var(--tilt-scale, 1.06)) translateY(var(--tilt-y, 0px));
+  will-change: transform;
   border: 1px solid var(--line-strong);
   border-radius: 26px;
   padding: 10px;
@@ -616,43 +628,25 @@ footer a { color: var(--text-muted); }
 }
 .tilt-inner canvas { display: block; width: 100%; height: 100%; }
 .skyline-caption {
-  position: absolute;
+  position: sticky;
+  top: calc(14vh + 252px);
   left: 24px;
-  bottom: -24px;
+  display: block;
+  margin-top: 10px;
   margin: 0;
   font-family: "Geist Mono", ui-monospace, monospace;
   font-size: 11px;
   color: var(--text-faint);
 }
 
-/* where the browser can drive an animation from the scroll position, it does */
-@supports (animation-timeline: view()) {
-  .tilt-card {
-    animation: flatten linear both;
-    animation-timeline: view();
-    animation-range: entry 10% cover 55%;
-  }
-  .intro {
-    animation: lift-away linear both;
-    animation-timeline: view();
-    animation-range: entry 40% cover 60%;
-  }
-}
-@keyframes flatten {
-  from { transform: rotateX(18deg) scale(1.04); }
-  to { transform: rotateX(0deg) scale(1); }
-}
-@keyframes lift-away {
-  from { transform: translateY(0); }
-  to { transform: translateY(-46px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .tilt-card { animation: none !important; transform: none !important; }
-  .intro { animation: none !important; transform: none !important; }
+  .tilt-card { transform: none !important; }
+  .intro { transform: none !important; }
 }
 
 @media (max-width: 959px) {
-  .tilt-stage { margin-bottom: 48px; perspective: 800px; }
+  .intro { min-height: 26vh; }
+  .tilt-stage { height: 118vh; margin-bottom: 36px; perspective: 760px; }
+  .tilt-card { top: 10vh; }
   .tilt-inner { height: 150px; }
 }

@@ -341,33 +341,45 @@ const sky = {
   canvas: null, ctx: null, towers: [], lit: -1, raf: null, w: 0, h: 0, dpr: 1, t: 0,
 };
 
-/* browsers without animation-timeline get the same move from an observer gated loop */
-function tiltFallback() {
+/* the card leans back and flattens as it is scrolled through. driven here rather than
+   by the css scroll timeline so the distance it takes is the same in every browser. */
+function tiltOnScroll() {
   const card = $("tilt-card");
   const intro = document.querySelector(".intro");
-  if (!card || CSS.supports("animation-timeline: view()")) return;
+  if (!card) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     card.style.setProperty("--tilt", "0deg");
     card.style.setProperty("--tilt-scale", "1");
     return;
   }
   let running = false;
+  const ease = (x) => 1 - Math.pow(1 - x, 3);
+
+  const stage = card.parentElement;
   const step = () => {
-    const box = card.getBoundingClientRect();
-    const span = window.innerHeight + box.height;
-    const seen = Math.min(1, Math.max(0, (window.innerHeight - box.top) / span));
-    const progress = Math.min(1, Math.max(0, (seen - 0.15) / 0.45));
-    card.style.setProperty("--tilt", `${18 * (1 - progress)}deg`);
-    card.style.setProperty("--tilt-scale", `${1 + 0.04 * (1 - progress)}`);
-    if (intro) intro.style.transform = `translateY(${-46 * progress}px)`;
+    const track = stage.getBoundingClientRect();
+    const view = window.innerHeight;
+    const pinned = view * 0.14;
+    // the card stays put while the track scrolls past it, and flattens over that distance
+    const travel = Math.max(1, track.height - card.offsetHeight - pinned);
+    const raw = (pinned - track.top) / travel;
+    const p = ease(Math.min(1, Math.max(0, raw)));
+    card.style.setProperty("--tilt", `${(26 * (1 - p)).toFixed(2)}deg`);
+    card.style.setProperty("--tilt-scale", (1 + 0.06 * (1 - p)).toFixed(4));
+    card.style.setProperty("--tilt-y", `${(28 * (1 - p)).toFixed(1)}px`);
+    if (intro) intro.style.transform = `translateY(${(-70 * p).toFixed(1)}px)`;
     if (running) requestAnimationFrame(step);
   };
+
   new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
+      const was = running;
       running = entry.isIntersecting;
-      if (running) requestAnimationFrame(step);
+      if (running && !was) requestAnimationFrame(step);
+      if (!running) step();                 // settle on the end state once it leaves
     });
-  }, { rootMargin: "100px" }).observe(card);
+  }, { rootMargin: "220px 0px" }).observe(card);
+  step();
 }
 
 function skylineSetup() {
@@ -528,7 +540,7 @@ function mix(from, to, amount) {
 boot().then(() => {
   revealOnScroll();
   skylineSetup();
-  tiltFallback();
+  tiltOnScroll();
   splitHeadline();
   predict();          // the panel opens with a real number rather than an empty shell
 });
